@@ -21,7 +21,7 @@ public class NVBR extends JavaPlugin {
 
         getCommand("globalchat").setExecutor(new GlobalChatCommand(globalChatManager));
 
-        getServer().getPluginManager().registerEvents(new EnderChestListener(enderChestSyncManager), this);
+        getServer().getPluginManager().registerEvents(enderChestSyncManager, this);
     }
 
     @Override
