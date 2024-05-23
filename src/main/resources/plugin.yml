@@ -1,0 +1,17 @@
+name: NVBR
+version: '${project.version}'
+main: org.nvbr.NVBR
+api-version: '1.20'
+authors: [somikyy]
+description: no velocity but redis plugin, lol.
+
+commands:
+  globalchat:
+    description: Global chat
+    usage: /<command> <message>
+    permission: nvbr.globalchat
+
+permissions:
+    nvbr.globalchat:
+        description: Permission to use global chat
+        default: op
