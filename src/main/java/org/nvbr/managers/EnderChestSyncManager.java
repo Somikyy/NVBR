@@ -1,43 +1,67 @@
 package org.nvbr.managers;
 
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.event.inventory.InventoryType;
-import org.nvbr.NVBR;
-import lombok.RequiredArgsConstructor;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import org.nvbr.models.EnderChestData;
-import redis.clients.jedis.Jedis;
-import com.google.gson.Gson;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-@RequiredArgsConstructor
-public class EnderChestSyncManager implements Listener {
-    private final NVBR plugin;
-    private final RedisManager redisManager;
-    private final Gson gson = new Gson();
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
+import org.nvbr.managers.MySQLManager.EnderChest;
 
-    public void saveEnderChest(Player player) {
-        try (Jedis jedis = redisManager.getJedis()) {
-            EnderChestData data = new EnderChestData(player.getEnderChest().getContents());
-            jedis.set("enderchest:" + player.getUniqueId(), gson.toJson(data));
-        }
+import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+public class EnderChestSyncManager implements Listener {
+    private MySQLManager mySQLManager;
+
+    public EnderChestSyncManager(MySQLManager mySQLManager) {
+        this.mySQLManager = mySQLManager;
+        startSyncTask();
     }
 
-    public void loadEnderChest(Player player) {
-        try (Jedis jedis = redisManager.getJedis()) {
-            String json = jedis.get("enderchest:" + player.getUniqueId());
-            if (json != null) {
-                EnderChestData data = gson.fromJson(json, EnderChestData.class);
-                player.getEnderChest().setContents(data.getContents());
+    private void startSyncTask() {
+        Bukkit.getScheduler().runTaskTimerAsynchronously(Bukkit.getPluginManager().getPlugin("NVBR"), () -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                savePlayerEnderChest(player);
             }
+        }, 0L, 20L);
+    }
+
+    private void savePlayerEnderChest(Player player) {
+        UUID playerId = player.getUniqueId();
+        Map<Integer, ItemStack> items = new HashMap<>();
+        ItemStack[] contents = player.getEnderChest().getContents();
+        for (int i = 0; i < contents.length; i++) {
+            if (contents[i] != null) {
+                items.put(i, contents[i]);
+            }
+        }
+        EnderChest enderChest = new EnderChest(playerId, items);
+        try {
+            mySQLManager.saveEnderChest(enderChest);
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
     }
 
     @EventHandler
-    public void onInventoryClose(InventoryCloseEvent event) {
-        if (event.getInventory().getType() == InventoryType.ENDER_CHEST) {
-            Player player = (Player) event.getPlayer();
-            saveEnderChest(player);
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        try {
+            EnderChest enderChest = mySQLManager.loadEnderChest(playerId);
+            if (enderChest != null) {
+                event.getPlayer().getEnderChest().setContents(enderChest.getItems().values().toArray(new ItemStack[0]));
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        savePlayerEnderChest(event.getPlayer());
     }
 }

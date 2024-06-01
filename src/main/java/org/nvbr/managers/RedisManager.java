@@ -25,6 +25,8 @@ public class RedisManager {
                 .setAddress("redis://" + plugin.getConfig().getString("redis.host") + ":" + plugin.getConfig().getInt("redis.port"));
         this.client = Redisson.create(config);
 
+        this.pool = new JedisPool(new JedisPoolConfig(), plugin.getConfig().getString("redis.host"));
+
         initPubSub();
     }
 
@@ -39,7 +41,7 @@ public class RedisManager {
 
     private void handleMessage(String channel, String message) {
         if ("globalchat".equals(channel)) {
-            Bukkit.getScheduler().runTask(plugin, () -> {
+            Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
                 Bukkit.getOnlinePlayers().forEach(player -> {
                     player.sendMessage(ChatColor.translateAlternateColorCodes('&', message));
                 });
